@@ -3,7 +3,8 @@
 #include <algorithm>
 #include <exception>
 #include <cerrno>                       // for errno
-#include <deque>
+#include <chrono>                       // for microseconds, duration
+#include <list>                         // for list
 #include <sys/time.h>                   // for timeval
 #include <cstring>                      // for strerror
 #include <fstream>                      // for ifstream
@@ -157,7 +158,7 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
     }
     unsigned int cwnd = 1;
     unsigned int ssthresh = 1;
-    std::deque<PacketWrapper> window;
+    std::list<PacketWrapper> window;
     timeval cur_timeout = { .tv_sec = 0, .tv_usec = 0 };
     uint32_t last_seq = seq;
     while (true)
