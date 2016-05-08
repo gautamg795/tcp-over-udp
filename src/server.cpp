@@ -73,9 +73,8 @@ int main(int argc, char** argv)
         /* std::ifstream infile(filename); */
         connect(sockfd, &reset, sizeof(reset));
         uint32_t seq = 0;
-        run = establish_connection(sockfd, seq) && send_file(sockfd, filename, seq);
-        if (run)
-            std::cout << "done sending file\n";
+        if (establish_connection(sockfd, seq) && send_file(sockfd, filename, seq))
+            std::cerr << "done sending file\n";
     }
     std::cout << "quitting\n";
 }
