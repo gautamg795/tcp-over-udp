@@ -3,6 +3,7 @@
 #include <algorithm>                    // for max, find_if
 #include <cerrno>                       // for errno
 #include <chrono>                       // for microseconds, duration
+#include <csignal>                      // for sigaction
 #include <cstddef>                      // for size_t
 #include <cstdint>                      // for uint32_t
 #include <cstring>                      // for strerror
@@ -10,9 +11,10 @@
 #include <iostream>                     // for operator<<, basic_ostream, etc
 #include <iterator>                     // for next
 #include <list>                         // for list
+#include <stdexcept>                    // for runtime_error
+
 #include <netdb.h>                      // for addrinfo, gai_strerror, etc
 #include <netinet/in.h>                 // for IPPROTO_UDP
-#include <stdexcept>                    // for runtime_error
 #include <sys/socket.h>                 // for bind, recv, send, etc
 #include <sys/time.h>                   // for timeval
 #include <unistd.h>                     // for close, ssize_t
@@ -23,6 +25,7 @@ bool close_connection(int sockfd, uint32_t seq);
 static timeval rcv_timeout = { .tv_sec = 0, .tv_usec = 500000 };
 static timeval close_timeout = { .tv_sec = 1, .tv_usec = 0 };
 static timeval no_timeout  = { .tv_sec = 0, .tv_usec = 0 };
+static bool keep_running = true;
 
 int main(int argc, char** argv)
 {
@@ -69,17 +72,22 @@ int main(int argc, char** argv)
         return 1;
     }
     freeaddrinfo(res);
-    bool run = true;
     struct sockaddr reset;
     reset.sa_family = AF_UNSPEC;
-    while (run)
+    struct sigaction sa;
+    std::memset(&sa, 0, sizeof(sa));
+    sa.sa_handler = [](int) { keep_running = false; };
+    sigaction(SIGINT, &sa, nullptr);
+    sigaction(SIGTERM, &sa, nullptr);
+    std::memset(&sa, 0, sizeof(sa));
+    while (keep_running)
     {
         connect(sockfd, &reset, sizeof(reset));
         uint32_t seq = 0;
         if (establish_connection(sockfd, seq) && send_file(sockfd, filename, seq))
             std::cerr << "done sending file\n";
     }
-    std::cout << "quitting\n";
+    close(sockfd);
 }
 
 bool establish_connection(int sockfd, uint32_t& seq_out)
