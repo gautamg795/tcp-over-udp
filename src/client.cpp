@@ -163,7 +163,8 @@ bool receive_file(int sockfd, uint32_t ack, uint32_t seq)
 
 bool close_connection(int sockfd, uint32_t ack, uint32_t seq)
 {
-    Packet in, out;
+    return true;
+/*    Packet in, out;
     out.headers.fin = out.headers.ack = true;
     out.headers.ack_number = ack;
     out.headers.seq_number = seq;
@@ -193,4 +194,5 @@ bool close_connection(int sockfd, uint32_t ack, uint32_t seq)
         }
         return true;
     }
+*/
 }
