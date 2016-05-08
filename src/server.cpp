@@ -1,17 +1,20 @@
 #include "Packet.h"                     // for Packet, add_seq, get_isn, etc
 
-#include <algorithm>
-#include <exception>
+#include <algorithm>                    // for max, find_if
 #include <cerrno>                       // for errno
 #include <chrono>                       // for microseconds, duration
-#include <list>                         // for list
-#include <sys/time.h>                   // for timeval
+#include <cstddef>                      // for size_t
+#include <cstdint>                      // for uint32_t
 #include <cstring>                      // for strerror
 #include <fstream>                      // for ifstream
 #include <iostream>                     // for operator<<, basic_ostream, etc
+#include <iterator>                     // for next
+#include <list>                         // for list
 #include <netdb.h>                      // for addrinfo, gai_strerror, etc
 #include <netinet/in.h>                 // for IPPROTO_UDP
+#include <stdexcept>                    // for runtime_error
 #include <sys/socket.h>                 // for bind, recv, send, etc
+#include <sys/time.h>                   // for timeval
 #include <unistd.h>                     // for close, ssize_t
 
 bool establish_connection(int sockfd, uint32_t& seq_out);
@@ -71,7 +74,6 @@ int main(int argc, char** argv)
     reset.sa_family = AF_UNSPEC;
     while (run)
     {
-        /* std::ifstream infile(filename); */
         connect(sockfd, &reset, sizeof(reset));
         uint32_t seq = 0;
         if (establish_connection(sockfd, seq) && send_file(sockfd, filename, seq))

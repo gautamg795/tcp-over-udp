@@ -1,16 +1,20 @@
 #include "Packet.h"
-#include <fstream>
-#include <cstring>
-#include <string>
-#include <thread>
-#include <iostream>
-#include <sys/socket.h>
-#include <netdb.h>
-#include <sys/types.h>
-#include <unistd.h>
+
+#include <algorithm>                    // for max
+#include <cerrno>                       // for errno
+#include <chrono>                       // for microseconds
+#include <cstdint>                      // for uint32_t
+#include <cstring>                      // for strerror
+#include <fstream>                      // for ofstream
+#include <iostream>                     // for cout, cerr, etc
+
+#include <netdb.h>                      // for addrinfo, getaddrinfo, etc
+#include <netinet/in.h>                 // for IPPROTO_UDP
+#include <sys/socket.h>                 // for bind, recv, send, etc
+#include <sys/time.h>                   // for timeval
+#include <unistd.h>                     // for close
 
 static timeval rcv_timeout = { .tv_sec = 0, .tv_usec = 500000 };
-static timeval no_timeout  = { .tv_sec = 0, .tv_usec = 0 };
 bool establish_connection(int sockfd, uint32_t& ack_out, uint32_t& seq_out);
 bool receive_file(int sockfd, uint32_t ack, uint32_t seq);
 bool close_connection(int sockfd, uint32_t ack, uint32_t seq);

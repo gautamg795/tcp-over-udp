@@ -1,13 +1,14 @@
 #ifndef PACKET_H
 #define PACKET_H
 
-#include <chrono>
-#include <iomanip>
+#include <algorithm>                    // for uniform_int_distribution, move
+#include <chrono>                       // for high_resolution_clock
+#include <cstddef>                      // for size_t
 #include <cstdint>                      // for uint32_t
 #include <cstring>                      // for memset
+#include <iomanip>                      // for setw
 #include <iostream>                     // for operator<<, basic_ostream, etc
 #include <random>                       // for mt19937, random_device, etc
-#include <cstddef>                      // for size_t
 
 struct Packet
 {
