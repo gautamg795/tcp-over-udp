@@ -191,6 +191,11 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
         {
             return close_connection(sockfd, last_seq);
         }
+        if (window.front().sent && now() - window.front().send_time > timeout)
+        {
+            window.front().sent = false;
+            window.front().retransmit = true;
+        }
         for (auto& p : window)
         {
             if (p.sent)
@@ -207,8 +212,9 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
             p.sent = true;
             p.send_time = now();
             std::cout << "Sending data packet " << p.packet.headers.seq_number
-                      << ' ' << cwnd << ' ' << ssthresh << std::endl;
-            std::cout << p.packet << std::endl;
+                      << ' ' << cwnd << ' ' << ssthresh 
+                      << (p.retransmit ? " Retransmission" : "") << std::endl;
+            std::cerr << p.packet << std::endl;
         }
         if (window.empty()) continue;
         cur_timeout.tv_usec = std::max((long)std::chrono::duration_cast<std::chrono::microseconds>(
@@ -222,16 +228,17 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
         if (bytes_read < 0 && errno != EAGAIN)
         {
             std::cerr << "recv(): " << std::strerror(errno) << std::endl;
-            continue;
+            return false;
         }
         else if (bytes_read < 0)
         {
             std::cerr << "timeout\n";
             window.front().sent = false;
+            window.front().retransmit = true;
             continue;
         }
         std::cout << "Receiving ack packet " << in.headers.ack_number << std::endl;
-        std::cout << in << std::endl;
+        std::cerr << in << std::endl;
         auto it = std::find_if(window.begin(), window.end(),
                 [&in](const PacketWrapper& elem) -> bool {
                     return add_seq(elem.packet.headers.seq_number,

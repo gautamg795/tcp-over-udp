@@ -42,10 +42,11 @@ struct Packet
 struct PacketWrapper
 {
     using time_point = decltype(std::chrono::high_resolution_clock::now());
-    PacketWrapper(Packet&& p) : packet(std::move(p)), sent(false) {}
+    PacketWrapper(Packet&& p) : packet(std::move(p)), sent(false), retransmit(false) {}
     Packet packet;
     time_point send_time;
     bool sent;
+    bool retransmit;
 };
 
 inline
