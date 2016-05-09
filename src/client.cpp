@@ -63,8 +63,7 @@ int main(int argc, char** argv)
     connect(sockfd, ptr->ai_addr, ptr->ai_addrlen);
     freeaddrinfo(res);
     uint32_t ack, seq;
-    establish_connection(sockfd, ack, seq);
-    receive_file(sockfd, ack, seq);
+    establish_connection(sockfd, ack, seq) && receive_file(sockfd, ack, seq);
     close(sockfd);
 }
 
@@ -128,7 +127,8 @@ bool receive_file(int sockfd, uint32_t ack, uint32_t seq)
         {
             out.headers.ack = true;
             out.headers.ack_number = ack;
-            std::cerr << "Sending ACK packet " << ack << std::endl;
+            std::cerr << "Sending ACK packet " << std::setw(5)
+                      << ack << std::endl;
             send_time = now();
             send(sockfd, (void*)&out, out.HEADER_SZ, 0);
         }
@@ -153,7 +153,8 @@ bool receive_file(int sockfd, uint32_t ack, uint32_t seq)
         {
             return close_connection(sockfd, add_seq(in.headers.seq_number, 1), seq);
         }
-        std::cout << "Received data packet " << in.headers.seq_number << std::endl;
+        std::cout << "Received data packet " << std::setw(5)
+                  << in.headers.seq_number << std::endl;
         std::cout << in << std::endl;
         if (in.headers.seq_number != ack)
         {
