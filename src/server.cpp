@@ -270,18 +270,55 @@ bool close_connection(int sockfd, uint32_t seq)
     Packet in, out;
     out.headers.fin = true;
     out.headers.seq_number = seq;
-    send(sockfd, (void*)&out, out.HEADER_SZ, 0);
     while (true)
     {
         if (send(sockfd, (void*)&out, out.HEADER_SZ, 0) < 0)
         {
-            return true;
+            std::cerr << "send(): " << std::strerror(errno) << std::endl;
+            return false;
         }
         setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &rcv_timeout, sizeof(rcv_timeout));
         ssize_t bytes_read = recv(sockfd, (void*)&in, sizeof(in), 0);
         if (bytes_read < 0 && errno != EAGAIN)
         {
+            std::cerr << "recv(): " << std::strerror(errno) << std::endl;
+            return false;
+        }
+        else if (bytes_read < 0)
+        {
+            std::cerr << "timeout\n";
+            continue;
+        }
+        else if (!in.headers.ack || !in.headers.fin || in.headers.ack_number != add_seq(seq, 1))
+        {
+            std::cerr << "Unexpected finack\n";
+            continue;
+        }
+        break;
+    }
+    out.clear();
+    seq = out.headers.seq_number = in.headers.ack_number;
+    out.headers.ack = true;
+    out.headers.ack_number = add_seq(in.headers.seq_number, 1);
+    while (true)
+    {
+        if (send(sockfd, (void*)&out, out.HEADER_SZ, 0) < 0)
+        {
+            std::cerr << "send(): " << std::strerror(errno) << std::endl;
+            return false;
+        }
+        setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &close_timeout, sizeof(close_timeout));
+        ssize_t bytes_read = recv(sockfd, (void*)&in, sizeof(in), 0);
+        if (bytes_read < 0 && errno != EAGAIN)
+        {
+            std::cerr << "recv(): " << std::strerror(errno) << std::endl;
+            return false;
+        }
+        else if (bytes_read < 0)
+        {
             return true;
         }
+        continue;
     }
+    return true;
 }
