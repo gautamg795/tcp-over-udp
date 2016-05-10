@@ -43,7 +43,7 @@ int main(int argc, char** argv)
     hints.ai_family = AF_INET;
     hints.ai_socktype = SOCK_DGRAM;
     hints.ai_flags = AI_PASSIVE | AI_NUMERICSERV;
-    int ret = getaddrinfo("localhost", port, &hints, &res);
+    int ret = getaddrinfo(nullptr, port, &hints, &res);
     if (ret < 0)
     {
         std::cerr << "getaddrinfo(): " << gai_strerror(ret) << std::endl;
