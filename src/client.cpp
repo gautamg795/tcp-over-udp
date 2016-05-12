@@ -148,9 +148,7 @@ bool receive_file(int sockfd, uint32_t ack, uint32_t seq)
         }
         else
             first = false;
-        cur_timeout.tv_usec = std::max(
-                (long)std::chrono::duration_cast<std::chrono::microseconds>(
-                    timeout - (now() - send_time)).count(), 0l);
+        cur_timeout = to_timeval(timeout - (now() - send_time));
         setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &cur_timeout, sizeof(cur_timeout));
         ssize_t bytes_read = recv(sockfd, (void*)&in, sizeof(in), 0);
         if (bytes_read < 0)

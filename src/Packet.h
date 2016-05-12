@@ -24,8 +24,8 @@ struct Packet
     static const size_t HEADER_SZ = sizeof(headers);
     static const size_t DATA_SZ   = MSS - HEADER_SZ;
     static const size_t SEQ_MAX   = 30720;
-    Packet() 
-    { 
+    Packet()
+    {
         static_assert(sizeof(Packet) == HEADER_SZ + DATA_SZ,
                 "Incorrect packet size");
         static_assert(sizeof(Packet) <= 1024,
@@ -43,7 +43,8 @@ struct Packet
 struct PacketWrapper
 {
     using time_point = decltype(std::chrono::high_resolution_clock::now());
-    PacketWrapper(Packet&& p) : packet(std::move(p)), sent(false), retransmit(false) {}
+    PacketWrapper(Packet&& p) :
+        packet(std::move(p)), sent(false), retransmit(false) {}
     Packet packet;
     time_point send_time;
     bool sent;
@@ -56,7 +57,7 @@ struct PacketWrapper
 inline
 std::ostream& operator<<(std::ostream& os, const Packet& p)
 {
-    os << "ack: " << p.headers.ack << "|fin: " << p.headers.fin << "|syn: " 
+    os << "ack: " << p.headers.ack << "|fin: " << p.headers.fin << "|syn: "
        << p.headers.syn << "|ack_number: " << std::setw(5) << p.headers.ack_number
        << "|seq_number: " << std::setw(5) << p.headers.seq_number << "|data_len: "
        << p.headers.data_len;
@@ -82,6 +83,22 @@ inline
 PacketWrapper::time_point now()
 {
     return std::chrono::high_resolution_clock::now();
+}
+
+template <typename Duration>
+timeval to_timeval(Duration&& d)
+{
+    using namespace std::chrono;
+    seconds sec = duration_cast<seconds>(d);
+    if (sec.count() < 0ll)
+    {
+        sec = sec.zero();
+    }
+    return
+    {
+        .tv_sec = sec.count(),
+        .tv_usec = (int)duration_cast<microseconds>(d-sec).count()
+    };
 }
 
 #endif

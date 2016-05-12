@@ -195,7 +195,7 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
                 Packet p;
                 ssize_t initial = infile.tellg();
                 p.headers.seq_number = add_seq(seq, infile.tellg());
-                infile.read(p.data, std::min(p.MSS, (size_t)(cwnd - cwnd_used)));
+                infile.read(p.data, std::min(Packet::MSS, (size_t)(cwnd - cwnd_used)));
                 if (infile.eof())
                 {
                     infile.clear();
@@ -240,8 +240,7 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
                       << (p.retransmit ? " Retransmission" : "") << std::endl;
             std::cerr << p.packet << std::endl;
         }
-        cur_timeout.tv_usec = std::max((long)std::chrono::duration_cast<std::chrono::microseconds>(
-                    timeout - (now() - window.front().send_time)).count(), 0l);
+        cur_timeout = to_timeval(timeout - (now() - window.front().send_time));
         Packet in;
         if (setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &cur_timeout, sizeof(cur_timeout)) < 0)
         {
