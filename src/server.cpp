@@ -1,6 +1,7 @@
 #include "Packet.h"                     // for Packet, add_seq, get_isn, etc
 
 #include <algorithm>                    // for max, find_if
+#include <cassert>
 #include <cerrno>                       // for errno
 #include <chrono>                       // for microseconds, duration
 #include <csignal>                      // for sigaction
@@ -169,8 +170,9 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
     {
         throw std::runtime_error("invalid file");
     }
-    unsigned int cwnd = 1;
-    unsigned int ssthresh = 1;
+    uint32_t cwnd = 1024;
+    uint32_t cwnd_used = 0;
+    uint32_t ssthresh = 30720;
     std::list<PacketWrapper> window;
     timeval cur_timeout = { .tv_sec = 0, .tv_usec = 0 };
     uint32_t last_seq = seq;
@@ -178,30 +180,29 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
     {
         if (infile)
         {
-            if (window.size() < cwnd)
+            while (cwnd_used < cwnd)
             {
-                for (size_t i = window.size(); i < cwnd && infile; i++)
+                Packet p;
+                ssize_t initial = infile.tellg();
+                p.headers.seq_number = add_seq(seq, infile.tellg());
+                infile.read(p.data, std::min(p.MSS, (size_t)(cwnd - cwnd_used)));
+                if (infile.eof())
                 {
-                    Packet p;            
-                    ssize_t initial = infile.tellg();
-                    p.headers.seq_number = add_seq(seq, infile.tellg());
-                    infile.read(p.data, p.DATA_SZ);
-                    if (infile.eof())
-                    {
-                        infile.clear();
-                        p.headers.data_len = (ssize_t)infile.tellg() - initial;
-                        infile.setstate(std::ifstream::eofbit | std::ifstream::failbit);
-                    }
-                    else
-                    {
-                        p.headers.data_len = (ssize_t)infile.tellg() - initial;
-                    }
-                    window.emplace_back(std::move(p));
+                    infile.clear();
+                    p.headers.data_len = (ssize_t)infile.tellg() - initial;
+                    infile.setstate(std::ifstream::eofbit | std::ifstream::failbit);
                 }
+                else
+                {
+                    p.headers.data_len = (ssize_t)infile.tellg() - initial;
+                }
+                window.emplace_back(std::move(p));
+                cwnd_used += p.headers.data_len;
             }
         }
         else if (window.empty())
         {
+            assert(cwnd_used == 0);
             return close_connection(sockfd, last_seq);
         }
         if (window.front().sent && now() - window.front().send_time > timeout)
@@ -229,7 +230,6 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
                       << (p.retransmit ? " Retransmission" : "") << std::endl;
             std::cerr << p.packet << std::endl;
         }
-        if (window.empty()) continue;
         cur_timeout.tv_usec = std::max((long)std::chrono::duration_cast<std::chrono::microseconds>(
                     timeout - (now() - window.front().send_time)).count(), 0l);
         Packet in;
@@ -263,8 +263,12 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
             std::cerr << "got non-matching ack??" << std::endl;
             continue;
         }
-        last_seq = std::max(last_seq, (uint32_t)in.headers.ack_number);
-        window.erase(window.begin(), std::next(it));
+        last_seq = in.headers.ack_number;
+        for (auto begin = window.begin(), end = std::next(it); begin != end; )
+        {
+            cwnd_used -= begin->packet.headers.data_len;
+            begin = window.erase(begin);
+        }
     }
 }
 
