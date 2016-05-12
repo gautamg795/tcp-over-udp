@@ -14,11 +14,21 @@
 #include <sys/time.h>                   // for timeval
 #include <unistd.h>                     // for close
 
+/*
+ * Static Variables
+ */
 static timeval rcv_timeout = { .tv_sec = 0, .tv_usec = 500000 };
+
+/*
+ * Function Declarations
+ */
 bool establish_connection(int sockfd, uint32_t& ack_out, uint32_t& seq_out);
 bool receive_file(int sockfd, uint32_t ack, uint32_t seq);
 bool close_connection(int sockfd, uint32_t ack, uint32_t seq);
 
+/*
+ * Implementations
+ */
 int main(int argc, char** argv)
 {
     if (argc != 3)

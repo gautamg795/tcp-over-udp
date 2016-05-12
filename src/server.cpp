@@ -20,14 +20,24 @@
 #include <sys/time.h>                   // for timeval
 #include <unistd.h>                     // for close, ssize_t
 
-bool establish_connection(int sockfd, uint32_t& seq_out);
-bool send_file(int sockfd, const char* filename, uint32_t seq);
-bool close_connection(int sockfd, uint32_t seq);
+/*
+ * Statkc Variables
+ */
 static timeval rcv_timeout = { .tv_sec = 0, .tv_usec = 500000 };
 static timeval close_timeout = { .tv_sec = 0, .tv_usec = 750000 };
 static timeval no_timeout  = { .tv_sec = 0, .tv_usec = 0 };
 static bool keep_running = true;
 
+/*
+ * Function Declarations
+ */
+bool establish_connection(int sockfd, uint32_t& seq_out);
+bool send_file(int sockfd, const char* filename, uint32_t seq);
+bool close_connection(int sockfd, uint32_t seq);
+
+/*
+ * Implementations
+ */
 int main(int argc, char** argv)
 {
     if (argc != 3)

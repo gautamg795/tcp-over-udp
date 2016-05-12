@@ -50,6 +50,9 @@ struct PacketWrapper
     bool retransmit;
 };
 
+/*
+ * Inline Implementations
+ */
 inline
 std::ostream& operator<<(std::ostream& os, const Packet& p)
 {
