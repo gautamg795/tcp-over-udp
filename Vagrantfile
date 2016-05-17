@@ -12,12 +12,12 @@ Vagrant.configure(2) do |config|
   config.vm.provision "shell", inline: $INSTALL_BASE
   config.vm.define :client, primary: true do |host|
       host.vm.hostname = "client"
-      host.vm.network "private_network", ip: "10.0.0.2", netmask: "255.255.255.0"
+      host.vm.network "private_network", ip: "10.0.0.3", netmask: "255.255.255.0"
       host.vm.provision "shell", inline: "tc qdisc add dev eth1 root netem loss 10% delay 20ms"
   end
   config.vm.define :server do |host|
       host.vm.hostname = "server"
-      host.vm.network "private_network", ip: "10.0.0.1", netmask: "255.255.255.0"
+      host.vm.network "private_network", ip: "10.0.0.2", netmask: "255.255.255.0"
       host.vm.provision "shell", inline: "tc qdisc add dev eth1 root netem loss 10% delay 20ms"
   end
 end
