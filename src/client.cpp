@@ -18,6 +18,7 @@
  * Static Variables
  */
 static timeval rcv_timeout = { .tv_sec = 0, .tv_usec = 500000 };
+static timeval close_timeout = { .tv_sec = 0, .tv_usec = 750000 };
 
 /*
  * Function Declarations
@@ -193,14 +194,14 @@ bool close_connection(int sockfd, uint32_t ack, uint32_t seq)
             return false;
         }
         std::cerr <<"Sent FIN-ACK\n";
-        setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &rcv_timeout, sizeof(rcv_timeout));
+        setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &close_timeout, sizeof(close_timeout));
         ssize_t bytes_read = recv(sockfd, (void*)&in, sizeof(in), 0);
         if (bytes_read < 0)
         {
             if (errno == EAGAIN)
             {
                 std::cerr << "timeout\n";
-                continue;
+                return true;
             }
             std::cerr << "recv(): " << std::strerror(errno) << std::endl;
             return false;
