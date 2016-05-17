@@ -188,29 +188,21 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
     uint32_t last_seq = seq;
     while (true)
     {
-        if (infile)
+        while (cwnd_used < cwnd && infile)
         {
-            while (cwnd_used < cwnd)
+            Packet p;
+            p.headers.seq_number = add_seq(seq, infile.tellg());
+            infile.read(p.data, std::min(Packet::DATA_SZ,
+                                        (size_t)(cwnd - cwnd_used)));
+            p.headers.data_len = (ssize_t)infile.gcount();
+            if (p.headers.data_len == 0)
             {
-                Packet p;
-                ssize_t initial = infile.tellg();
-                p.headers.seq_number = add_seq(seq, infile.tellg());
-                infile.read(p.data, std::min(Packet::MSS, (size_t)(cwnd - cwnd_used)));
-                if (infile.eof())
-                {
-                    infile.clear();
-                    p.headers.data_len = (ssize_t)infile.tellg() - initial;
-                    infile.setstate(std::ifstream::eofbit | std::ifstream::failbit);
-                }
-                else
-                {
-                    p.headers.data_len = (ssize_t)infile.tellg() - initial;
-                }
-                window.emplace_back(std::move(p));
-                cwnd_used += p.headers.data_len;
+                break;
             }
+            window.emplace_back(std::move(p));
+            cwnd_used += p.headers.data_len;
         }
-        else if (window.empty())
+        if (window.empty())
         {
             assert(cwnd_used == 0);
             return close_connection(sockfd, last_seq);
