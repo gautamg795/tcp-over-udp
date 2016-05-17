@@ -131,7 +131,7 @@ bool receive_file(int sockfd, uint32_t ack, uint32_t seq)
     std::chrono::milliseconds timeout(500);
     auto send_time = now();
     timeval cur_timeout = { .tv_sec = 0, .tv_usec = 0 };
-    std::ofstream outfile("outfile", std::ofstream::binary);
+    std::ofstream outfile("received.file", std::ofstream::binary);
     Packet out;
     Packet in;
     bool first = true;
