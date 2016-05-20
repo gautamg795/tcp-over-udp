@@ -192,8 +192,8 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
         {
             Packet p;
             p.headers.seq_number = add_seq(seq, infile.tellg());
-            infile.read(p.data, std::min(Packet::DATA_SZ,
-                                        (size_t)(cwnd - cwnd_used)));
+            infile.read(p.data, std::min((size_t)Packet::DATA_SZ,
+                                         (size_t)(cwnd - cwnd_used)));
             p.headers.data_len = (ssize_t)infile.gcount();
             if (p.headers.data_len == 0)
             {
