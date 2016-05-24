@@ -7,6 +7,7 @@
 #include <cstring>                      // for strerror
 #include <fstream>                      // for ofstream
 #include <iostream>                     // for cout, cerr, etc
+#include <unordered_map>                // for unordered_map
 
 #include <netdb.h>                      // for addrinfo, getaddrinfo, etc
 #include <netinet/in.h>                 // for IPPROTO_UDP
@@ -133,6 +134,7 @@ bool receive_file(int sockfd, uint32_t ack, uint32_t seq)
     auto send_time = now();
     timeval cur_timeout = { .tv_sec = 0, .tv_usec = 0 };
     std::ofstream outfile("received.file", std::ofstream::binary);
+    std::unordered_map<uint32_t, Packet> packet_cache;
     Packet out;
     Packet in;
     bool first = true;
@@ -142,7 +144,7 @@ bool receive_file(int sockfd, uint32_t ack, uint32_t seq)
         {
             out.headers.ack = true;
             out.headers.ack_number = ack;
-            std::cerr << "Sending ACK packet " << std::setw(5)
+            std::cout << "Sending ACK packet " << std::setw(5)
                       << ack << std::endl;
             send_time = now();
             send(sockfd, (void*)&out, out.HEADER_SZ, 0);
@@ -151,6 +153,7 @@ bool receive_file(int sockfd, uint32_t ack, uint32_t seq)
             first = false;
         cur_timeout = to_timeval(timeout - (now() - send_time));
         setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &cur_timeout, sizeof(cur_timeout));
+        in.clear();
         ssize_t bytes_read = recv(sockfd, (void*)&in, sizeof(in), 0);
         if (bytes_read < 0)
         {
@@ -168,13 +171,36 @@ bool receive_file(int sockfd, uint32_t ack, uint32_t seq)
         }
         std::cout << "Received data packet " << std::setw(5)
                   << in.headers.seq_number << std::endl;
-        std::cout << in << std::endl;
+        std::cerr << in << std::endl;
         if (in.headers.seq_number != ack)
         {
+            // If the packet definitely isn't part of the window, discard it
+            if ((ack < Packet::SEQ_MAX / 2 &&
+                        in.headers.seq_number > add_seq(ack, Packet::SEQ_MAX / 2))
+                    ||
+                    (in.headers.seq_number < ack &&
+                     (ack - in.headers.seq_number) < Packet::SEQ_MAX))
+            {
+                continue;
+            }
+            std::cerr << "caching packet\n";
+            packet_cache.emplace(in.headers.seq_number, std::move(in));
             continue;
         }
-        outfile.write(in.data, in.headers.data_len);
-        ack = add_seq(ack, in.headers.data_len);
+        else
+        {
+            outfile.write(in.data, in.headers.data_len);
+            ack = add_seq(ack, in.headers.data_len);
+            decltype(packet_cache)::iterator it;
+            while ((it = packet_cache.find(ack)) != packet_cache.end())
+            {
+                std::cerr << "removing packet from cache\n";
+                in = std::move(it->second);
+                outfile.write(in.data, in.headers.data_len);
+                ack = add_seq(ack, in.headers.data_len);
+                packet_cache.erase(it);
+            }
+        }
     }
     return true;
 }

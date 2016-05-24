@@ -36,7 +36,7 @@ struct Packet
     Packet& operator=(const Packet&) = delete;
     Packet(Packet&&) = default; // Moving a Packet will be fast!
     Packet& operator=(Packet&&) = default;
-    void clear() { std::memset(this, 0, sizeof(*this)); }
+    void clear() { std::memset(&headers, 0, HEADER_SZ); }
     char data[DATA_SZ];
 };
 
