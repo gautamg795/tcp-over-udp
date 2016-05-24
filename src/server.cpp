@@ -83,6 +83,11 @@ int main(int argc, char** argv)
         return 1;
     }
     freeaddrinfo(res);
+    // We make a 'reset' sockaddr used to reset the socket's connection state
+    // Remember that UDP sockets can't actually connect to anything, but calling
+    // connect() on a socket sets its defaults so that send/receive don't need
+    // to be given a target every time. We need to reset those defaults between
+    // connections, and connecting to AF_UNSPEC does that
     sockaddr reset;
     reset.sa_family = AF_UNSPEC;
     struct sigaction sa;
