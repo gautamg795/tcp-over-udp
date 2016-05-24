@@ -83,7 +83,7 @@ int main(int argc, char** argv)
         return 1;
     }
     freeaddrinfo(res);
-    struct sockaddr reset;
+    sockaddr reset;
     reset.sa_family = AF_UNSPEC;
     struct sigaction sa;
     std::memset(&sa, 0, sizeof(sa));
