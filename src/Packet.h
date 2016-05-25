@@ -40,8 +40,14 @@ struct Packet
     char data[DATA_SZ];
 };
 
+/**
+ * structure used by server to keep track of sent packets, what time they were
+ * sent, if they were retransmitted, etc
+ */
 struct PacketWrapper
 {
+    // 'using x = y' is like 'typedef y x' and gives us the shorthand time_point
+    // to represent the type returned by the now() function
     using time_point = decltype(std::chrono::high_resolution_clock::now());
     PacketWrapper(Packet&& p) :
         packet(std::move(p)), sent(false), retransmit(false) {}
@@ -54,6 +60,10 @@ struct PacketWrapper
 /*
  * Inline Implementations
  */
+
+/**
+ * ostream operator for outputting a packet
+ */
 inline
 std::ostream& operator<<(std::ostream& os, const Packet& p)
 {
@@ -64,27 +74,42 @@ std::ostream& operator<<(std::ostream& os, const Packet& p)
     return os;
 }
 
+/**
+ * Generates a random sequence number in range [0, SEQ_MAX]
+ */
 inline
 uint32_t get_isn()
 {
+    // Create the random devices and generators--static so they are only
+    // initialized once. These are more random than C-style rand()
     static std::random_device rd;
     static std::mt19937 rndgen(rd());
     static std::uniform_int_distribution<> dist(0, Packet::SEQ_MAX);
+    // Return a value from the uniform distribution
     return dist(rndgen);
 }
 
+/**
+ * Handles modulo addition to the sequence number
+ */
 inline
 uint32_t add_seq(uint32_t base, uint32_t add)
 {
     return (base + add) % Packet::SEQ_MAX;
 }
 
+/**
+ * Returns the current time
+ */
 inline
 PacketWrapper::time_point now()
 {
     return std::chrono::high_resolution_clock::now();
 }
 
+/**
+ * Converts a std::chrono duration to a timeval
+ */
 template <typename Duration>
 timeval to_timeval(Duration&& d)
 {
