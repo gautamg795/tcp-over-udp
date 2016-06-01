@@ -13,23 +13,24 @@
 struct Packet
 {
     struct {
-    bool ack : 1;
-    bool syn : 1;
-    bool fin : 1;
-    uint16_t ack_number;
-    uint16_t seq_number;
-    uint16_t data_len;
+        uint16_t ack_number;
+        uint16_t seq_number;
+        union {
+            uint16_t data_len; // used by server to keep track of how big packet is
+            uint16_t window_sz; // used by client to report its window size
+        };
+        bool ack : 1;
+        bool syn : 1;
+        bool fin : 1;
     } headers;
-    static const size_t MSS       = 1024;
+    static const size_t PKT_SZ    = 1032;
+    static const size_t DATA_SZ   = 1024;
     static const size_t HEADER_SZ = sizeof(headers);
-    static const size_t DATA_SZ   = MSS - HEADER_SZ;
     static const size_t SEQ_MAX   = 30720;
     Packet()
     {
-        static_assert(sizeof(Packet) == HEADER_SZ + DATA_SZ,
+        static_assert(sizeof(Packet) == PKT_SZ,
                 "Incorrect packet size");
-        static_assert(sizeof(Packet) <= 1024,
-                "Packet larger than 1024 bytes");
         clear();
     }
     Packet(const Packet&) = delete; // Copying a Packet will be slow

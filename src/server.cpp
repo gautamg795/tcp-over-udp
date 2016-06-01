@@ -21,7 +21,7 @@
 #include <unistd.h>                     // for close, ssize_t
 
 /*
- * Statkc Variables
+ * Static Variables
  */
 static timeval rcv_timeout = { .tv_sec = 0, .tv_usec = 500000 };
 static timeval close_timeout = { .tv_sec = 0, .tv_usec = 750000 };

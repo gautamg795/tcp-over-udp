@@ -104,6 +104,7 @@ bool establish_connection(int sockfd, uint32_t& ack_out, uint32_t& seq_out)
     out.headers.syn = true;
     // Generate the initial sequence number randomly
     out.headers.seq_number = get_isn();
+    out.headers.window_sz = Packet::SEQ_MAX;
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &rcv_timeout, sizeof(rcv_timeout));
     // Set the timeout appropriately
     while (true)
@@ -148,6 +149,7 @@ bool establish_connection(int sockfd, uint32_t& ack_out, uint32_t& seq_out)
     out.clear();
     out.headers.ack = true;
     out.headers.seq_number = in.headers.ack_number;
+    out.headers.window_sz = Packet::SEQ_MAX;
     seq_out = add_seq(in.headers.ack_number, 1);
     ack_out = out.headers.ack_number = add_seq(in.headers.seq_number, 1);
     std::cerr << "snd: " << out << std::endl;
@@ -188,6 +190,7 @@ bool receive_file(int sockfd, uint32_t ack, uint32_t seq)
             out.headers.ack_number = ack;
             std::cout << "Sending ACK packet " << std::setw(5)
                       << ack << std::endl;
+            out.headers.window_sz = Packet::SEQ_MAX;
             send_time = now();
             send(sockfd, (void*)&out, out.HEADER_SZ, 0);
         }
@@ -280,6 +283,7 @@ bool close_connection(int sockfd, uint32_t ack, uint32_t seq)
     out.headers.fin = out.headers.ack = true;
     out.headers.ack_number = ack;
     out.headers.seq_number = seq;
+    out.headers.window_sz = Packet::SEQ_MAX;
     while (true)
     {
         // Write the FIN-ACK
