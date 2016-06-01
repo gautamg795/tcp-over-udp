@@ -1,7 +1,7 @@
 #include "Packet.h"                     // for Packet, add_seq, get_isn, etc
 
 #include <algorithm>                    // for max, find_if
-#include <cassert>
+#include <cassert>                      // TODO: delete me
 #include <cerrno>                       // for errno
 #include <chrono>                       // for microseconds, duration
 #include <csignal>                      // for sigaction
@@ -35,6 +35,12 @@ bool establish_connection(int sockfd, uint32_t& seq_out);
 bool send_file(int sockfd, const char* filename, uint32_t seq);
 bool close_connection(int sockfd, uint32_t seq);
 
+enum class Mode {
+    SS, // slow start
+    CA, // congestion avoidance
+    FR  // fast recovery
+};
+
 /*
  * Implementations
  */
@@ -49,6 +55,7 @@ int main(int argc, char** argv)
     char* filename = argv[2];
     int sockfd = -1;
 
+    // Make the socket and bind
     addrinfo hints, *res;
     hints.ai_protocol = IPPROTO_UDP;
     hints.ai_family = AF_INET;
@@ -63,7 +70,7 @@ int main(int argc, char** argv)
     auto ptr = res;
     for (; ptr != nullptr; ptr = ptr->ai_next)
     {
-        sockfd = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);        
+        sockfd = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
         if (sockfd < 0)
         {
             std::cerr << "socket(): " << std::strerror(errno) << std::endl;
@@ -90,12 +97,13 @@ int main(int argc, char** argv)
     // connections, and connecting to AF_UNSPEC does that
     sockaddr reset;
     reset.sa_family = AF_UNSPEC;
+    // Set up signal handler to end the run loop
     struct sigaction sa;
     std::memset(&sa, 0, sizeof(sa));
     sa.sa_handler = [](int) { keep_running = false; };
     sigaction(SIGINT, &sa, nullptr);
     sigaction(SIGTERM, &sa, nullptr);
-    std::memset(&sa, 0, sizeof(sa));
+
     while (keep_running)
     {
         connect(sockfd, &reset, sizeof(reset));
@@ -169,16 +177,15 @@ bool establish_connection(int sockfd, uint32_t& seq_out)
         {
             continue;
         }
-        std::cerr << "rcv: " << in << std::endl;
         seq_out = in.headers.ack_number;
         break;
     }
-    std::cerr << "handshake complete\n";
     return true;
 }
 
 bool send_file(int sockfd, const char* filename, uint32_t seq)
 {
+    Mode current_mode = Mode::SS;
     std::chrono::milliseconds timeout(500);
     std::ifstream infile(filename, std::ifstream::binary);
     if (!infile)
@@ -188,6 +195,7 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
     uint32_t cwnd = 1024;
     uint32_t cwnd_used = 0;
     uint32_t ssthresh = 30720;
+    uint32_t duplicate_acks = 0;
     std::list<PacketWrapper> window;
     timeval cur_timeout = { .tv_sec = 0, .tv_usec = 0 };
     uint32_t last_seq = seq;
@@ -266,10 +274,56 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
                 });
         if (it == window.end())
         {
-            std::cerr << "got non-matching ack??" << std::endl;
+            if (current_mode == Mode::FR)
+            {
+                cwnd += Packet::DATA_SZ;
+                cwnd = std::min((uint32_t)Packet::SEQ_MAX / 2, cwnd);
+                cwnd = std::min((uint32_t)in.headers.window_sz, cwnd);
+                window.front().sent = false;
+                window.front().retransmit = true;
+            }
+            else if (++duplicate_acks == 3)
+            {
+                duplicate_acks = 0;
+                window.front().sent = false;
+                window.front().retransmit = true;
+                ssthresh = cwnd / 2;
+                cwnd = ssthresh + 3 * Packet::DATA_SZ;
+                current_mode = Mode::FR;
+                cwnd = std::min((uint32_t)Packet::SEQ_MAX / 2, cwnd);
+                cwnd = std::min((uint32_t)in.headers.window_sz, cwnd);
+            }
             continue;
         }
         last_seq = in.headers.ack_number;
+        switch(current_mode)
+        {
+            case Mode::SS:
+            {
+                cwnd += Packet::DATA_SZ;
+                break;
+            }
+            case Mode::CA:
+            {
+                cwnd += std::max(1,
+                        (int)std::round(Packet::DATA_SZ * (double)Packet::DATA_SZ / cwnd));
+                break;
+            }
+            case Mode::FR:
+            {
+                cwnd = ssthresh;
+                duplicate_acks = 0;
+                current_mode = Mode::CA;
+                break;
+            }
+        }
+        cwnd = std::min((uint32_t)Packet::SEQ_MAX / 2, cwnd);
+        cwnd = std::min((uint32_t)in.headers.window_sz, cwnd);
+        if (cwnd >= ssthresh)
+        {
+            current_mode = Mode::CA;
+        }
+        duplicate_acks = 0;
         for (auto begin = window.begin(), end = std::next(it); begin != end; )
         {
             cwnd_used -= begin->packet.headers.data_len;
