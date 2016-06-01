@@ -132,12 +132,10 @@ bool establish_connection(int sockfd, uint32_t& seq_out)
     }
     else if (!in.headers.syn)
     {
-        std::cerr << "Non-syn packet received\n";
         return false;
     }
     else if (bytes_read < (ssize_t)Packet::HEADER_SZ)
     {
-        std::cerr << "Incomplete packet received\n";
         return false;
     }
     if (connect(sockfd, client, client_len) < 0)
@@ -145,12 +143,10 @@ bool establish_connection(int sockfd, uint32_t& seq_out)
         std::cerr << "connect(): " << std::strerror(errno) << std::endl;
         return false;
     }
-    std::cerr << "rcv: " << in << std::endl;
     Packet out;
     out.headers.ack = out.headers.syn = true;
     out.headers.ack_number = add_seq(in.headers.seq_number, 1);
     out.headers.seq_number = get_isn();
-    std::cerr << "snd: " << out << std::endl;
     while (true)
     {
         int ret = send(sockfd, (void*)&out, out.HEADER_SZ, 0);
@@ -169,7 +165,6 @@ bool establish_connection(int sockfd, uint32_t& seq_out)
         }
         if (bytes_read < 0)
         {
-            std::cerr << "timeout\n";
             continue;
         }
         if (!in.headers.ack ||
@@ -217,7 +212,7 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
         }
         if (window.empty())
         {
-            assert(cwnd_used == 0);
+            assert(cwnd_used == 0); // TODO: delete me
             return close_connection(sockfd, last_seq);
         }
         if (window.front().sent && now() - window.front().send_time > timeout)
@@ -240,10 +235,10 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
             }
             p.sent = true;
             p.send_time = now();
-            std::cout << "Sending data packet " << p.packet.headers.seq_number
-                      << ' ' << cwnd << ' ' << ssthresh 
+            std::cout << "Sending data packet " << std::setw(6)
+                      << p.packet.headers.seq_number << ' ' << std::setw(5)
+                      << cwnd << ' ' << std::setw(5) << ssthresh
                       << (p.retransmit ? " Retransmission" : "") << std::endl;
-            std::cerr << p.packet << std::endl;
         }
         cur_timeout = to_timeval(timeout - (now() - window.front().send_time));
         Packet in;
@@ -259,13 +254,15 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
         }
         else if (bytes_read < 0)
         {
-            std::cerr << "timeout\n";
             window.front().sent = false;
             window.front().retransmit = true;
+            ssthresh = cwnd / 2;
+            cwnd = Packet::DATA_SZ;
+            current_mode = Mode::SS;
             continue;
         }
-        std::cout << "Receiving ack packet " << in.headers.ack_number << std::endl;
-        std::cerr << in << std::endl;
+        std::cout << "Receiving ack packet " << std::setw(5)
+                  << in.headers.ack_number << std::endl;
         auto it = std::find_if(window.begin(), window.end(),
                 [&in](const PacketWrapper& elem) -> bool {
                     return add_seq(elem.packet.headers.seq_number,
@@ -334,7 +331,6 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
 
 bool close_connection(int sockfd, uint32_t seq)
 {
-    std::cerr << "Closing connection\n";
     Packet in, out;
     out.headers.fin = true;
     out.headers.seq_number = seq;
@@ -345,7 +341,6 @@ bool close_connection(int sockfd, uint32_t seq)
             std::cerr << "send(): " << std::strerror(errno) << std::endl;
             return false;
         }
-        std::cerr <<"Sent FIN\n";
         setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &rcv_timeout, sizeof(rcv_timeout));
         ssize_t bytes_read = recv(sockfd, (void*)&in, sizeof(in), 0);
         if (bytes_read < 0 && errno != EAGAIN)
@@ -355,15 +350,12 @@ bool close_connection(int sockfd, uint32_t seq)
         }
         else if (bytes_read < 0)
         {
-            std::cerr << "timeout\n";
             continue;
         }
         else if (!in.headers.ack || !in.headers.fin || in.headers.ack_number != add_seq(seq, 1))
         {
-            std::cerr << "Unexpected finack\n";
             continue;
         }
-        std::cerr << "Received FIN-ACK ok\n";
         break;
     }
     out.clear();
@@ -383,7 +375,6 @@ bool close_connection(int sockfd, uint32_t seq)
         {
             if (errno == EAGAIN || errno == ECONNREFUSED) // Client got ack and went away
             {
-                std::cerr << "closed connection okay\n";
                 return true;
             }
             else
