@@ -23,6 +23,7 @@
 static timeval rcv_timeout = { .tv_sec = 0, .tv_usec = 500000 };
 // how long to wait after sending FIN-ACK for final ACK
 static timeval close_timeout = { .tv_sec = 0, .tv_usec = 750000 };
+const uint16_t MAX_WINDOW_SZ = 30720;
 
 /*
  * Function Declarations
@@ -104,7 +105,7 @@ bool establish_connection(int sockfd, uint32_t& ack_out, uint32_t& seq_out)
     out.headers.syn = true;
     // Generate the initial sequence number randomly
     out.headers.seq_number = get_isn();
-    out.headers.window_sz = Packet::SEQ_MAX;
+    out.headers.window_sz = MAX_WINDOW_SZ;
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &rcv_timeout, sizeof(rcv_timeout));
     // Set the timeout appropriately
     while (true)
@@ -146,7 +147,7 @@ bool establish_connection(int sockfd, uint32_t& ack_out, uint32_t& seq_out)
     out.clear();
     out.headers.ack = true;
     out.headers.seq_number = in.headers.ack_number;
-    out.headers.window_sz = Packet::SEQ_MAX;
+    out.headers.window_sz = MAX_WINDOW_SZ;
     seq_out = add_seq(in.headers.ack_number, 1);
     ack_out = out.headers.ack_number = add_seq(in.headers.seq_number, 1);
     send(sockfd, (void*)&out, out.HEADER_SZ, 0);
@@ -184,7 +185,7 @@ bool receive_file(int sockfd, uint32_t ack, uint32_t seq)
             // Send the acknowledgment for the last received packet
             out.headers.ack = true;
             out.headers.ack_number = ack;
-            out.headers.window_sz = Packet::SEQ_MAX;
+            out.headers.window_sz = MAX_WINDOW_SZ;
             std::cout << "Sending ACK packet " << std::setw(7)
                       << ack << (retransmit ? " Retransmission" : "") 
                       << std::endl;
@@ -288,7 +289,7 @@ bool close_connection(int sockfd, uint32_t ack, uint32_t seq)
     out.headers.fin = out.headers.ack = true;
     out.headers.ack_number = ack;
     out.headers.seq_number = seq;
-    out.headers.window_sz = Packet::SEQ_MAX;
+    out.headers.window_sz = MAX_WINDOW_SZ;
     while (true)
     {
         // Write the FIN-ACK
