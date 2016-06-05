@@ -277,8 +277,6 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
             if (current_mode == Mode::FR)
             {
                 cwnd += Packet::DATA_SZ;
-                cwnd = std::min((uint32_t)Packet::SEQ_MAX / 2, cwnd);
-                cwnd = std::min((uint32_t)in.headers.window_sz, cwnd);
                 window.front().sent = false;
                 window.front().retransmit = true;
             }
@@ -290,9 +288,18 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
                 ssthresh = cwnd / 2;
                 cwnd = ssthresh + 3 * Packet::DATA_SZ;
                 current_mode = Mode::FR;
-                cwnd = std::min((uint32_t)Packet::SEQ_MAX / 2, cwnd);
-                cwnd = std::min((uint32_t)in.headers.window_sz, cwnd);
             }
+            else if (current_mode == Mode::SS)
+            {
+                cwnd += Packet::DATA_SZ;
+            }
+            else if (current_mode == Mode::CA)
+            {
+                cwnd += std::max(1,
+                        (int)std::round(Packet::DATA_SZ * (double)Packet::DATA_SZ / cwnd));
+            }
+            cwnd = std::min((uint32_t)Packet::SEQ_MAX / 2, cwnd);
+            cwnd = std::min((uint32_t)in.headers.window_sz, cwnd);
             continue;
         }
         last_seq = in.headers.ack_number;
