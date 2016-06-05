@@ -215,7 +215,6 @@ bool receive_file(int sockfd, uint32_t ack, uint32_t seq)
         // If we get a FIN packet, get ready to close the connection
         if (in.headers.fin)
         {
-            assert(packet_cache.empty()); // TODO: delete me
             return close_connection(sockfd, add_seq(in.headers.seq_number, 1), seq);
         }
         std::cout << "Received data packet " << std::setw(5)
