@@ -230,16 +230,26 @@ bool receive_file(int sockfd, uint32_t ack, uint32_t seq)
             // If the packet definitely isn't part of the window (is a
             // duplicate), discard it
             // We know that the window size will never be more than 30720/2
-            if ((ack < Packet::SEQ_MAX / 2 &&
-                        in.headers.seq_number > add_seq(ack, Packet::SEQ_MAX / 2))
-                    ||
-                    (in.headers.seq_number < ack &&
-                     (ack - in.headers.seq_number) < Packet::SEQ_MAX))
+            if (ack > Packet::SEQ_MAX / 2)
             {
-                continue;
+                if (in.headers.seq_number > ack)
+                {
+                    packet_cache.emplace(in.headers.seq_number, std::move(in));
+                }
+                else if (in.headers.seq_number < ack && in.headers.seq_number <
+                         add_seq(ack, Packet::SEQ_MAX / 2))
+                {
+                    packet_cache.emplace(in.headers.seq_number, std::move(in));
+                }
             }
-            // If it is in our window, cache the packet for later
-            packet_cache.emplace(in.headers.seq_number, std::move(in));
+            else if (ack <= Packet::SEQ_MAX / 2)
+            {
+                if (in.headers.seq_number > ack &&
+                         in.headers.seq_number < add_seq(ack, Packet::SEQ_MAX / 2))
+                {
+                    packet_cache.emplace(in.headers.seq_number, std::move(in));
+                }
+            }
             continue;
         }
         else
