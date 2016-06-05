@@ -4,7 +4,6 @@
 #include <cassert>                      // TODO: delete me
 #include <cerrno>                       // for errno
 #include <chrono>                       // for microseconds, duration
-#include <csignal>                      // for sigaction
 #include <cstddef>                      // for size_t
 #include <cstdint>                      // for uint32_t
 #include <cstring>                      // for strerror
@@ -26,7 +25,6 @@
 static timeval rcv_timeout = { .tv_sec = 0, .tv_usec = 500000 };
 static timeval close_timeout = { .tv_sec = 0, .tv_usec = 750000 };
 static timeval no_timeout  = { .tv_sec = 0, .tv_usec = 0 };
-static bool keep_running = true;
 
 /*
  * Function Declarations
@@ -90,26 +88,8 @@ int main(int argc, char** argv)
         return 1;
     }
     freeaddrinfo(res);
-    // We make a 'reset' sockaddr used to reset the socket's connection state
-    // Remember that UDP sockets can't actually connect to anything, but calling
-    // connect() on a socket sets its defaults so that send/receive don't need
-    // to be given a target every time. We need to reset those defaults between
-    // connections, and connecting to AF_UNSPEC does that
-    sockaddr reset;
-    reset.sa_family = AF_UNSPEC;
-    // Set up signal handler to end the run loop
-    struct sigaction sa;
-    std::memset(&sa, 0, sizeof(sa));
-    sa.sa_handler = [](int) { keep_running = false; };
-    sigaction(SIGINT, &sa, nullptr);
-    sigaction(SIGTERM, &sa, nullptr);
-
-    while (keep_running)
-    {
-        connect(sockfd, &reset, sizeof(reset));
-        uint32_t seq = 0;
-        establish_connection(sockfd, seq) && send_file(sockfd, filename, seq);
-    }
+    uint32_t seq = 0;
+    establish_connection(sockfd, seq) && send_file(sockfd, filename, seq);
     close(sockfd);
 }
 
