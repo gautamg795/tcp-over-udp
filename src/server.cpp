@@ -215,16 +215,19 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
             assert(cwnd_used == 0); // TODO: delete me
             return close_connection(sockfd, last_seq);
         }
-        if (window.front().sent && now() - window.front().send_time > timeout)
-        {
-            window.front().sent = false;
-            window.front().retransmit = true;
-        }
         for (auto& p : window)
         {
             if (p.sent)
             {
-                continue;
+                if (now() - p.send_time > timeout)
+                {
+                    p.sent = false;
+                    p.retransmit = true;
+                }
+                else
+                {
+                    continue;
+                }
             }
             int ret = send(sockfd, (void*)&p.packet, p.packet.HEADER_SZ +
                     p.packet.headers.data_len, 0);
