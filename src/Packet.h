@@ -21,9 +21,19 @@ struct Packet
             uint16_t data_len; // used by server to keep track of how big packet is
             uint16_t window_sz; // used by client to report its window size
         };
+    #if __BYTE_ORDER__ == __ORDER_LITTLE_ENDIAN__
         bool ack : 1;
         bool syn : 1;
         bool fin : 1;
+        bool _   : 5;
+    #elif __BYTE_ORDER__ == __ORDER_BIG_ENDIAN__
+        bool _   : 5;
+        bool fin : 1;
+        bool syn : 1;
+        bool ack : 1;
+    #else
+    #error "Unknown endian or __BYTE_ORDER__ not defined"
+    #endif
     } headers;
 
     static const size_t PKT_SZ    = 1032;
