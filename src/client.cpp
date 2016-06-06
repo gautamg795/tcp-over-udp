@@ -106,17 +106,18 @@ bool establish_connection(int sockfd, uint32_t& ack_out, uint32_t& seq_out)
     // Generate the initial sequence number randomly
     out.headers.seq_number = get_isn();
     out.headers.window_sz = MAX_WINDOW_SZ;
-    out.to_network();
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &rcv_timeout, sizeof(rcv_timeout));
     // Set the timeout appropriately
     while (true)
     {
+        out.to_network();
         // Send the initial SYN packet
         if (send(sockfd, (void*)&out, out.HEADER_SZ, 0) < 0)
         {
             std::cerr << "send(): " << std::strerror(errno) << std::endl;
             return false;
         }
+        out.to_host();
         // Try to receive a response
         int ret = recv(sockfd, (void*)&in, sizeof(in), 0);
         in.to_host();

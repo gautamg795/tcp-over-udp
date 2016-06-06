@@ -213,9 +213,9 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
                     continue;
                 }
             }
+            size_t bytes_to_send = Packet::HEADER_SZ + p.packet.headers.data_len;
             p.packet.to_network();
-            int ret = send(sockfd, (void*)&p.packet, p.packet.HEADER_SZ +
-                    p.packet.headers.data_len, 0);
+            int ret = send(sockfd, (void*)&p.packet, bytes_to_send, 0);
             p.packet.to_host();
             if (ret < 0)
             {
