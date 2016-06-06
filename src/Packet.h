@@ -10,6 +10,8 @@
 #include <iostream>                     // for operator<<, basic_ostream, etc
 #include <random>                       // for mt19937, random_device, etc
 
+#include <arpa/inet.h>                  // for htons, htonl, ntohs, etc
+
 struct Packet
 {
     struct {
@@ -23,10 +25,14 @@ struct Packet
         bool syn : 1;
         bool fin : 1;
     } headers;
+
     static const size_t PKT_SZ    = 1032;
     static const size_t DATA_SZ   = 1024;
     static const size_t HEADER_SZ = sizeof(headers);
     static const size_t SEQ_MAX   = 30720;
+
+    char data[DATA_SZ];
+
     Packet()
     {
         static_assert(sizeof(Packet) == PKT_SZ,
@@ -38,7 +44,18 @@ struct Packet
     Packet(Packet&&) = default; // Moving a Packet will be fast!
     Packet& operator=(Packet&&) = default;
     void clear() { std::memset(&headers, 0, HEADER_SZ); }
-    char data[DATA_SZ];
+    void to_network()
+    {
+        headers.ack_number = htons(headers.ack_number);
+        headers.seq_number = htons(headers.seq_number);
+        headers.window_sz = htons(headers.window_sz);
+    }
+    void to_host()
+    {
+        headers.ack_number = ntohs(headers.ack_number);
+        headers.seq_number = ntohs(headers.seq_number);
+        headers.window_sz = ntohs(headers.window_sz);
+    }
 };
 
 /**

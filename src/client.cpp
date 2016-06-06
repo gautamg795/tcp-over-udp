@@ -106,6 +106,7 @@ bool establish_connection(int sockfd, uint32_t& ack_out, uint32_t& seq_out)
     // Generate the initial sequence number randomly
     out.headers.seq_number = get_isn();
     out.headers.window_sz = MAX_WINDOW_SZ;
+    out.to_network();
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &rcv_timeout, sizeof(rcv_timeout));
     // Set the timeout appropriately
     while (true)
@@ -118,6 +119,7 @@ bool establish_connection(int sockfd, uint32_t& ack_out, uint32_t& seq_out)
         }
         // Try to receive a response
         int ret = recv(sockfd, (void*)&in, sizeof(in), 0);
+        in.to_host();
         if (ret < 0)
         {
             // recv returns EAGAIN if we timed out
@@ -150,6 +152,7 @@ bool establish_connection(int sockfd, uint32_t& ack_out, uint32_t& seq_out)
     out.headers.window_sz = MAX_WINDOW_SZ;
     seq_out = add_seq(in.headers.ack_number, 1);
     ack_out = out.headers.ack_number = add_seq(in.headers.seq_number, 1);
+    out.to_network();
     send(sockfd, (void*)&out, out.HEADER_SZ, 0);
     return true;
 }
@@ -190,7 +193,9 @@ bool receive_file(int sockfd, uint32_t ack, uint32_t seq)
                       << ack << (retransmit ? " Retransmission" : "") 
                       << std::endl;
             send_time = now();
+            out.to_network();
             send(sockfd, (void*)&out, out.HEADER_SZ, 0);
+            out.to_host();
         }
         else
             first = false;
@@ -203,6 +208,7 @@ bool receive_file(int sockfd, uint32_t ack, uint32_t seq)
         // Receive a packet
         in.clear();
         ssize_t bytes_read = recv(sockfd, (void*)&in, sizeof(in), 0);
+        in.to_host();
         if (bytes_read < 0)
         {
             if (errno == EAGAIN)
@@ -291,15 +297,18 @@ bool close_connection(int sockfd, uint32_t ack, uint32_t seq)
     out.headers.window_sz = MAX_WINDOW_SZ;
     while (true)
     {
+        out.to_network();
         // Write the FIN-ACK
         if (send(sockfd, (void*)&out, out.HEADER_SZ, 0) < 0)
         {
             std::cerr << "send(): " << std::strerror(errno) << std::endl;
             return false;
         }
+        out.to_host();
         // Wait up to close_timeout seconds for an ACK from the server
         setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &close_timeout, sizeof(close_timeout));
         ssize_t bytes_read = recv(sockfd, (void*)&in, sizeof(in), 0);
+        in.to_host();
         if (bytes_read < 0)
         {
             if (errno == EAGAIN)

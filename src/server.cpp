@@ -101,6 +101,7 @@ bool establish_connection(int sockfd, uint32_t& seq_out)
     Packet in;
     setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &no_timeout, sizeof(no_timeout));
     ssize_t bytes_read = recvfrom(sockfd, (void*)&in, sizeof(in), 0, client, &client_len);
+    in.to_host();
     if (bytes_read < 0)
     {
         if (errno == EINTR)
@@ -129,7 +130,9 @@ bool establish_connection(int sockfd, uint32_t& seq_out)
     out.headers.seq_number = get_isn();
     while (true)
     {
+        out.to_network();
         int ret = send(sockfd, (void*)&out, out.HEADER_SZ, 0);
+        out.to_host();
         if (ret < 0)
         {
             std::cerr << "send(): " << std::strerror(errno) << std::endl;
@@ -147,6 +150,7 @@ bool establish_connection(int sockfd, uint32_t& seq_out)
         {
             continue;
         }
+        in.to_host();
         if (!in.headers.ack ||
                 in.headers.ack_number != add_seq(out.headers.seq_number, 1))
         {
@@ -209,8 +213,10 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
                     continue;
                 }
             }
+            p.packet.to_network();
             int ret = send(sockfd, (void*)&p.packet, p.packet.HEADER_SZ +
                     p.packet.headers.data_len, 0);
+            p.packet.to_host();
             if (ret < 0)
             {
                 std::cerr << "send(): " << std::strerror(errno) << std::endl;
@@ -230,6 +236,7 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
             std::cerr << "setsockopt(): " << std::strerror(errno) << std::endl;
         }
         ssize_t bytes_read = recv(sockfd, (void*)&in, sizeof(in), 0);
+        in.to_host();
         if (bytes_read < 0 && errno != EAGAIN)
         {
             std::cerr << "recv(): " << std::strerror(errno) << std::endl;
@@ -326,13 +333,16 @@ bool close_connection(int sockfd, uint32_t seq)
     out.headers.seq_number = seq;
     while (true)
     {
+        out.to_network();
         if (send(sockfd, (void*)&out, out.HEADER_SZ, 0) < 0)
         {
             std::cerr << "send(): " << std::strerror(errno) << std::endl;
             return false;
         }
+        out.to_host();
         setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &rcv_timeout, sizeof(rcv_timeout));
         ssize_t bytes_read = recv(sockfd, (void*)&in, sizeof(in), 0);
+        in.to_host();
         if (bytes_read < 0 && errno != EAGAIN)
         {
             std::cerr << "recv(): " << std::strerror(errno) << std::endl;
@@ -354,13 +364,16 @@ bool close_connection(int sockfd, uint32_t seq)
     out.headers.ack_number = add_seq(in.headers.seq_number, 1);
     while (true)
     {
+        out.to_network();
         if (send(sockfd, (void*)&out, out.HEADER_SZ, 0) < 0)
         {
             std::cerr << "send(): " << std::strerror(errno) << std::endl;
             return false;
         }
+        out.to_host();
         setsockopt(sockfd, SOL_SOCKET, SO_RCVTIMEO, &close_timeout, sizeof(close_timeout));
         ssize_t bytes_read = recv(sockfd, (void*)&in, sizeof(in), 0);
+        in.to_host();
         if (bytes_read < 0)
         {
             if (errno == EAGAIN || errno == ECONNREFUSED) // Client got ack and went away
