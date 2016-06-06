@@ -23,7 +23,7 @@
  * Static Variables
  */
 static timeval rcv_timeout = { .tv_sec = 0, .tv_usec = 500000 };
-static timeval close_timeout = { .tv_sec = 0, .tv_usec = 750000 };
+static timeval close_timeout = { .tv_sec = 1, .tv_usec = 0 };
 static timeval no_timeout  = { .tv_sec = 0, .tv_usec = 0 };
 
 /*
@@ -246,7 +246,7 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
         {
             window.front().sent = false;
             window.front().retransmit = true;
-            ssthresh = cwnd / 2;
+            ssthresh = std::max(1024u, cwnd / 2);
             cwnd = Packet::DATA_SZ;
             current_mode = Mode::SS;
             continue;
@@ -272,7 +272,7 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
                 duplicate_acks = 0;
                 window.front().sent = false;
                 window.front().retransmit = true;
-                ssthresh = cwnd / 2;
+                ssthresh = std::max(1024u, cwnd / 2);
                 cwnd = ssthresh + 3 * Packet::DATA_SZ;
                 current_mode = Mode::FR;
             }
@@ -287,6 +287,7 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
             }
             cwnd = std::min((uint32_t)Packet::SEQ_MAX / 2, cwnd);
             cwnd = std::min((uint32_t)in.headers.window_sz, cwnd);
+            cwnd = std::max(cwnd, 1024u);
             continue;
         }
         last_seq = in.headers.ack_number;
@@ -313,6 +314,7 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
         }
         cwnd = std::min((uint32_t)Packet::SEQ_MAX / 2, cwnd);
         cwnd = std::min((uint32_t)in.headers.window_sz, cwnd);
+        cwnd = std::max(cwnd, 1024u);
         if (cwnd >= ssthresh)
         {
             current_mode = Mode::CA;

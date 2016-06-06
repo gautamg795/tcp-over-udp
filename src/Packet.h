@@ -29,7 +29,7 @@ struct Packet
     static const size_t PKT_SZ    = 1032;
     static const size_t DATA_SZ   = 1024;
     static const size_t HEADER_SZ = sizeof(headers);
-    static const size_t SEQ_MAX   = 30720;
+    static const size_t SEQ_MAX   = 15360;
 
     char data[DATA_SZ];
 

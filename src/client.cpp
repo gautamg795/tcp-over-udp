@@ -22,8 +22,8 @@
 // how long to wait on rcv by default
 static timeval rcv_timeout = { .tv_sec = 0, .tv_usec = 500000 };
 // how long to wait after sending FIN-ACK for final ACK
-static timeval close_timeout = { .tv_sec = 0, .tv_usec = 750000 };
-const uint16_t MAX_WINDOW_SZ = 30720;
+static timeval close_timeout = { .tv_sec = 1, .tv_usec = 0 };
+const uint16_t MAX_WINDOW_SZ = 15360;
 
 /*
  * Function Declarations
@@ -173,7 +173,7 @@ bool receive_file(int sockfd, uint32_t ack, uint32_t seq)
     auto send_time = now(); // now() is a function returning the current time
     timeval cur_timeout = { .tv_sec = 0, .tv_usec = 0 };
     // Open a fstream for the output file
-    std::ofstream outfile("received.file", std::ofstream::binary);
+    std::ofstream outfile("received.data", std::ofstream::binary);
     // Used to cache out of order packets by sequence number
     std::unordered_map<uint32_t, Packet> packet_cache;
     Packet out;
@@ -236,7 +236,7 @@ bool receive_file(int sockfd, uint32_t ack, uint32_t seq)
 
             // If the packet definitely isn't part of the window (is a
             // duplicate), discard it
-            // We know that the window size will never be more than 30720/2
+            // We know that the window size will never be more than 15360/2
             if (ack > Packet::SEQ_MAX / 2)
             {
                 if (in.headers.seq_number > ack)
