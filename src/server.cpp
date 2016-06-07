@@ -199,20 +199,29 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
             assert(cwnd_used == 0); // TODO: delete me
             return close_connection(sockfd, last_seq);
         }
-        for (auto& p : window)
+        for (auto begin_it = window.begin(); begin_it != window.end(); begin_it++)
         {
+            auto& p = *begin_it;
             if (p.sent)
             {
                 if (now() - p.send_time > timeout)
                 {
                     p.sent = false;
                     p.retransmit = true;
+                    ssthresh = std::max(1024u, cwnd / 2);
+                    cwnd = Packet::DATA_SZ;
+                    current_mode = Mode::SS;
                 }
                 else
                 {
                     continue;
                 }
             }
+            uint32_t bytes_sent = std::accumulate(window.begin(), begin_it, 0,
+                    [](const PacketWrapper& p, uint32_t acc) -> uint32_t
+                    {  return acc + p.packet.headers.data_len; });
+            if (bytes_sent > cwnd)
+                continue;
             size_t bytes_to_send = Packet::HEADER_SZ + p.packet.headers.data_len;
             p.packet.to_network();
             int ret = send(sockfd, (void*)&p.packet, bytes_to_send, 0);
