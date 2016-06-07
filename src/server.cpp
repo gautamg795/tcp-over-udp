@@ -199,14 +199,6 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
             assert(cwnd_used == 0); // TODO: delete me
             return close_connection(sockfd, last_seq);
         }
-        if (window.front().sent && now() - window.front().send_time > timeout)
-        {
-            window.front().sent = false;
-            window.front().retransmit = true;
-            ssthresh = std::max(1024u, cwnd / 2);
-            cwnd = Packet::DATA_SZ;
-            current_mode = Mode::SS;
-        }
         uint32_t bytes_sent = 0;
         for (auto begin_it = window.begin(); begin_it != window.end(); begin_it++)
         {
@@ -214,7 +206,18 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
             bytes_sent += p.packet.headers.data_len;
             if (p.sent)
             {
-                continue;
+                if (now() - p.send_time > timeout)
+                {
+                    p.sent = false;
+                    p.retransmit = true;
+                    ssthresh = std::max(1024u, cwnd / 2);
+                    cwnd = Packet::DATA_SZ;
+                    current_mode = Mode::SS;
+                }
+                else
+                {
+                    continue;
+                }
             }
             if (bytes_sent > cwnd)
                 continue;
@@ -247,7 +250,7 @@ bool send_file(int sockfd, const char* filename, uint32_t seq)
             std::cerr << "recv(): " << std::strerror(errno) << std::endl;
             return false;
         }
-        else if (bytes_read < 0) // timeout
+        else if (bytes_read < 0)
         {
             window.front().sent = false;
             window.front().retransmit = true;
